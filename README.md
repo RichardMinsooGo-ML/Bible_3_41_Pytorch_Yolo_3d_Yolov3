@@ -30,18 +30,24 @@ https://drive.google.com/drive/folders/1w4KNO2jIlkyzQgUkkcZ18zrC8A1Nqvwa?usp=sha
 
 You can download darknet weights from my google drive:
 
-- [x] Complex Yolo v4:
+- [x] Yolo3d - Yolo v4:
 
-https://drive.google.com/file/d/1jVNRuencSHRtjDQcWySVDGSI_bqfKfCP/view?usp=sharing
+https://drive.google.com/file/d/15Hza0MjND3EWJDOt8R0XBXOZnCRoMA2o/view?usp=sharing
 
-- [x] Complex Yolo v4 - tiny:
+- [x] Yolo3d - Yolo v4 - tiny:
 
-      On training
-
+https://drive.google.com/file/d/1IUXbc2dIm-Qowhwb44aCHJze536dJcwU/view?usp=sharing
 
 ## 3. Quick start
 
 ### 3.1. Download pretrained weights 
+
+      ${ROOT}
+      ├── checkpoints/
+      │    ├── Model_yolo3d_yolov3.pth
+      │    ├── Model_yolo3d_yolov3_tiny.pth
+      │    ├── yolov3.weights
+      │    └── yolov3-tiny.weights
 
 ### 3.2. Dataset shall contains shall contains belows.
 - [x] `detect_1` folder shall contain folders and contents.
@@ -72,14 +78,14 @@ https://drive.google.com/file/d/1jVNRuencSHRtjDQcWySVDGSI_bqfKfCP/view?usp=shari
 
 - [x] Detection test for `Yolo v3` with `detect_1` folder.
 
-       $ python detection.py --model_def config/cfg/complex_yolov4.cfg --pretrained_path checkpoints/Complex_yolo_yolo_v4.pth
+       $ python detection.py --model_def config/cfg/yolo3d_yolov3.cfg --pretrained_path checkpoints/Model_yolo3d_yolov3.pth
+       or       
        $ python detection.py
       
 - [x] Detection test for `Yolo v3-tiny` with `detect_1` folder.
 
-       On training : it will be updated soon!  
-             
-       
+       $ python detection.py --model_def config/cfg/yolo3d_yolov3_tiny.cfg --pretrained_path checkpoints/Model_yolo3d_yolov3_tiny.pth
+                    
 ### 3.4 Demo Video 
 - [x] One side detection demo.
 
@@ -193,8 +199,8 @@ ${ROOT}
        $ python eval_mAP.py --model_def config/complex_yolov3_tiny.cfg --pretrained_path checkpoints/Complex_yolo_yolo_v3_tiny.pth --batch_size 8
     
 ```
-      100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 354/354 [01:37<00:00,  3.63it/s]
-      Computing AP: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 3/3 [00:00<00:00, 107.29it/s]
+      100%|████████████████████████████████████████████████████████████████████████████| 354/354 [01:37<00:00,  3.63it/s]
+      Computing AP: 100%|█████████████████████████████████████████████████████████████████| 3/3 [00:00<00:00, 107.29it/s]
 
       Done computing mAP...
 
@@ -227,10 +233,10 @@ ${ROOT}
 ├── README.md 
 ├── train.py
 ├── checkpoints/ 
-│    ├── Complex_yolo_yolo_v4.pth
-│    ├── Complex_yolo_yolo_v4_tiny.pth
-│    ├── yolov4.weights
-│    └── yolov4-tiny.weights
+│    ├── Model_yolo3d_yolov3.pth
+│    ├── Model_yolo3d_yolov3_tiny.pth
+│    ├── yolov3.weights
+│    └── yolov3-tiny.weights
 ├── config/ 
 │    ├── cfg/
 │    │     ├── complex_yolov3.cfg

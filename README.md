@@ -30,11 +30,11 @@ https://drive.google.com/drive/folders/1w4KNO2jIlkyzQgUkkcZ18zrC8A1Nqvwa?usp=sha
 
 You can download darknet weights from my google drive:
 
-- [x] Yolo3d - Yolo v4:
+- [x] Yolo3d - Yolo v3:
 
 https://drive.google.com/file/d/15Hza0MjND3EWJDOt8R0XBXOZnCRoMA2o/view?usp=sharing
 
-- [x] Yolo3d - Yolo v4 - tiny:
+- [x] Yolo3d - Yolo v3 - tiny:
 
 https://drive.google.com/file/d/1IUXbc2dIm-Qowhwb44aCHJze536dJcwU/view?usp=sharing
 

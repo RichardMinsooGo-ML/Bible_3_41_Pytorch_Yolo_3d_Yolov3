@@ -63,9 +63,11 @@ def main():
     # learning rate scheduler config
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.8)
         
-    f = open('checkpoints/global_epoch.pckl', 'rb')
-    global_epoch = pickle.load(f)
-    f.close()
+    # f = open('checkpoints/global_epoch.pckl', 'rb')
+    # global_epoch = pickle.load(f)
+    # f.close()
+    
+    global_epoch = 0
     
     # Create dataloader
     # train_dataloader, train_sampler = create_train_dataloader(configs)

@@ -1,9 +1,3 @@
-# python train.py --model_def config/cfg/yolo3d_yolov3.cfg --pretrained_path checkpoints/Model_yolo3d_yolov3.pth --save_path checkpoints/Model_yolo3d_yolov3.pth
-# python train.py --model_def config/cfg/yolo3d_yolov3.cfg --pretrained_path checkpoints/yolov3.weights --save_path checkpoints/Model_yolo3d_yolov3.pth
-
-# python train.py  --model_def config/cfg/yolo3d_yolov3_tiny.cfg --pretrained_path checkpoints/Model_yolo3d_yolov3_tiny.pth --save_path checkpoints/Model_yolo3d_yolov3_tiny.pth
-# python train.py  --model_def config/cfg/yolo3d_yolov3_tiny.cfg --pretrained_path checkpoints/yolov3-tiny.weights --save_path checkpoints/Model_yolo3d_yolov3_tiny.pth
-
 from terminaltables import AsciiTable
 
 import os, sys, time, datetime, argparse
@@ -16,25 +10,40 @@ from data_process.kitti_dataloader import create_train_dataloader, create_val_da
 
 # from models.model_utils import create_model, make_data_parallel
 from models.models import *
+
 from utils.evaluation_utils import load_classes
-from config.train_config import parse_train_configs
 import torch.optim as optim
 from eval_mAP import evaluate_mAP
 
-import pickle
+from config.train_config import parse_train_configs
 
 def main():
+    # Get data configuration
+    configs = parse_train_configs()
     
-    configs = parse_train_configs()    
+    # Hardware configurations 
+    print(configs.device)
 
-    ############## Hardware configurations #############################    
-    configs.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Initiate model
     model = Darknet(configs.model_def, img_size=configs.img_size).to(configs.device)
     model.apply(weights_init_normal)
     
     # Get data configuration
     class_names = load_classes("dataset/classes.names")
+    
+    print(configs.pretrained_path)
+    
+    assert os.path.isfile(configs.pretrained_path), "No file at {}".format(configs.pretrained_path)
+
+    # If specified we start from checkpoint
+    if configs.pretrained_path:
+        if configs.pretrained_path.endswith(".pth"):
+            model.load_state_dict(torch.load(configs.pretrained_path))
+            print("Trained pytorch weight loaded!")
+        else:
+            model.load_darknet_weights(configs.pretrained_path)
+            print("Darknet weight loaded!")
+
 
     """
     idx_cnt = 0
@@ -49,41 +58,46 @@ def main():
         idx_cnt += 1
     """
     
-    # If specified we start from checkpoint
-    if configs.pretrained_path:
-        if configs.pretrained_path.endswith(".pth"):
-            model.load_state_dict(torch.load(configs.pretrained_path))
-            print("Trained pytorch weight loaded!")
-        else:
-            model.load_darknet_weights(configs.pretrained_path)
-            print("Darknet weight loaded!")
-
     optimizer = torch.optim.Adam(model.parameters())
 
+    metrics = [
+        "grid_size",
+        "loss",
+        "loss_x",
+        "loss_y",
+        "loss_z",
+        "loss_w",
+        "loss_h",
+        "loss_l",
+        "loss_im",
+        "loss_re",
+        "loss_obj",
+        "loss_cls",
+        "cls_acc",
+        # "recall50",
+        # "recall75",
+        # "precision",
+        "conf_obj",
+        "conf_noobj",
+    ]
+    
     # learning rate scheduler config
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.8)
-        
-    # f = open('checkpoints/global_epoch.pckl', 'rb')
-    # global_epoch = pickle.load(f)
-    # f.close()
-    
-    global_epoch = 0
     
     # Create dataloader
-    # train_dataloader, train_sampler = create_train_dataloader(configs)
-    train_dataloader = create_val_dataloader(configs)
+    train_dataloader, train_sampler = create_train_dataloader(configs)
+    # train_dataloader = create_val_dataloader(configs)
     
-    max_mAP_max = 0.5
-        
+    max_mAP = 0.5
+    start_time = time.time() 
     for epoch in range(0, configs.num_epochs, 1):
-            
-        num_iters_per_epoch = len(train_dataloader)        
+        
+        num_iters_per_epoch = len(train_dataloader)
 
-        # print(num_iters_per_epoch)
+        print(num_iters_per_epoch)
 
         # switch to train mode
         model.train()
-        # start_time = time.time()
         
         epoch_loss = 0
         # Training        
@@ -114,9 +128,6 @@ def main():
             img = Image.fromarray(data)
             img.save('my_img.png')
             img.show()
-
-            import sys
-            sys.exit()
             """
             
             # data_time.update(time.time() - start_time)
@@ -127,6 +138,7 @@ def main():
 
             targets = targets.to(configs.device, non_blocking=True)
             imgs = imgs.to(configs.device, non_blocking=True)
+
             total_loss, outputs = model(imgs, targets)
             
             epoch_loss += float(total_loss.item())
@@ -148,37 +160,49 @@ def main():
             # ----------------
             #   Log progress
             # ----------------
-            
+            if (batch_idx+1) % int(len(train_dataloader)/3) == 0:
+
+                log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % ((epoch+1), configs.num_epochs, (batch_idx+1), len(train_dataloader))
+
+                metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.yolo_layers))]]]
+
+                # Log metrics at each YOLO layer
+                for i, metric in enumerate(metrics):
+                    formats = {m: "%.6f" for m in metrics}
+                    formats["grid_size"] = "%2d"
+                    formats["cls_acc"] = "%.2f%%"
+                    row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in model.yolo_layers]
+                    metric_table += [[metric, *row_metrics]]
+
+                    # Tensorboard logging
+                    tensorboard_log = []
+                    for j, yolo in enumerate(model.yolo_layers):
+                        for name, metric in yolo.metrics.items():
+                            if name != "grid_size":
+                                tensorboard_log += [(f"{name}_{j+1}", metric)]
+                    tensorboard_log += [("loss", total_loss.item())]
+                    # logger.list_of_scalars_summary(tensorboard_log, global_step)
+
+                log_str += AsciiTable(metric_table).table
+                log_str += f"\nTotal loss {total_loss.item()}"
+
+                # Determine approximate time left for epoch
+                epoch_batches_left = len(train_dataloader) - (batch_idx + 1)
+                time_left = datetime.timedelta(seconds=epoch_batches_left * (time.time() - start_time) / (batch_idx + 1))
+                log_str += f"\n---- ETA {time_left}"
+
+                print(log_str)
+
+            # model.seen += imgs.size(0)
         crnt_epoch_loss = epoch_loss/num_iters_per_epoch
-        # Evaulation        
         
         torch.save(model.state_dict(), configs.save_path)
-        global_epoch += 1
+        # global_epoch += 1
         
-        print("Global_epoch :",global_epoch, "/ loss : {:1.5f}".format(crnt_epoch_loss),'Saved at {}'.format(configs.save_path))
+        # print("Global_epoch :",global_epoch, "Current epoch loss : {:1.5f}".format(crnt_epoch_loss),'Saved at {}'.format(configs.save_path))
+        print("Current epoch loss : {:1.5f}".format(crnt_epoch_loss),'Saved at {}'.format(configs.save_path))
         
-        f = open('checkpoints/global_epoch.pckl', 'wb')
-        pickle.dump(global_epoch, f)
-        f.close()
-        
-                    
-    #-------------------------------------------------------------------------------------
-        """            
-
-            # Save checkpoint
-            if max_mAP_new > max_mAP_max:
-                torch.save(model.state_dict(), configs.save_path)
-                print('save a checkpoint at {}'.format(configs.save_path))
-                max_mAP_max = max_mAP_new
-            else:
-                model.load_state_dict(torch.load(configs.pretrained_path))
-                print("Max mAP weight will be used again!")
-        """            
-        
-    # Evaulation        
-    #-------------------------------------------------------------------------------------        
-    # if (epoch+1) % 8 == 0:
-
+    # Evaulation
     print("\n---- Evaluating Model ----")
     val_dataloader = create_val_dataloader(configs)
     precision, recall, AP, f1, ap_class = evaluate_mAP(val_dataloader, model, configs)
@@ -198,8 +222,15 @@ def main():
     print(AsciiTable(ap_table).table)
     print(f"---- mAP {AP.mean()}")
 
-    max_mAP_new = AP.mean()
-    
+    max_mAP = AP.mean()
+    #-------------------------------------------------------------------------------------
+    """
+    # Save checkpoint
+    if (epoch+1) % configs.checkpoint_freq == 0:
+        torch.save(model.state_dict(), configs.save_path)
+        print('save a checkpoint at {}'.format(configs.save_path))
+    """
+            
 if __name__ == '__main__':
     main()
     
